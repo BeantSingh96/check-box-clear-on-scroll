@@ -1,0 +1,470 @@
+package com.knickglobal.adminapp.fragments;
+
+
+import android.app.Activity;
+import android.app.Dialog;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.Bundle;
+
+import androidx.annotation.NonNull;
+import androidx.fragment.app.Fragment;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import android.text.TextUtils;
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.Spinner;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.bumptech.glide.Glide;
+import com.knickglobal.adminapp.R;
+import com.knickglobal.adminapp.activities.ProfileActivity;
+import com.knickglobal.adminapp.adapters.GroupSmsAdapter;
+import com.knickglobal.adminapp.model.GroupSmsPojo;
+import com.knickglobal.adminapp.model.SendGroupMessagePojo;
+import com.knickglobal.adminapp.retrofit.ApiClient;
+import com.knickglobal.adminapp.retrofit.ApiInterface;
+import com.knickglobal.adminapp.sharedPreferences.App;
+import com.knickglobal.adminapp.utils.AppConstants;
+import com.knickglobal.adminapp.utils.CommonUtils;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import de.hdodenhof.circleimageview.CircleImageView;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
+/**
+ * A simple {@link Fragment} subclass.
+ */
+public class GroupSmsFragment extends Fragment implements View.OnClickListener {
+
+    private Activity activity;
+    private ApiInterface apiInterface;
+
+    private RecyclerView groupSmsRC;
+    private CircleImageView profileImageAppBar;
+
+    private List<GroupSmsPojo.Detail> details;
+    private GroupSmsAdapter adapter;
+    private CheckBox smsToUserCB;
+
+    private String searchType = "";
+
+    private List<String> listIds = new ArrayList<>();
+
+    private List<String> districtList = new ArrayList<>();
+    private List<String> areaList = new ArrayList<>();
+    private List<String> constitutionList = new ArrayList<>();
+    private List<String> qualificationList = new ArrayList<>();
+
+    private int checkUncheck = 0;
+    private int changeList = 0;
+
+    public GroupSmsFragment() {
+        // Required empty public constructor
+    }
+
+
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        // Inflate the layout for this fragment
+        View view = inflater.inflate(R.layout.fragment_group_sms, container, false);
+
+        inits(view);
+
+        return view;
+    }
+
+    private void inits(View view) {
+
+        activity = getActivity();
+
+        apiInterface = ApiClient.getClient().create(ApiInterface.class);
+
+        ImageView homeLogoBack = view.findViewById(R.id.homeLogoBack);
+        homeLogoBack.setImageResource(R.drawable.ic_left_arrow);
+        homeLogoBack.setOnClickListener(this);
+
+        TextView appbarText = view.findViewById(R.id.appbarText);
+        appbarText.setVisibility(View.VISIBLE);
+        appbarText.setText(R.string.group_sms);
+
+        ImageView filterAppbar = view.findViewById(R.id.filterAppbar);
+        filterAppbar.setVisibility(View.VISIBLE);
+        filterAppbar.setImageResource(R.drawable.ic_filter);
+        filterAppbar.setOnClickListener(this);
+
+        profileImageAppBar = view.findViewById(R.id.profileImageAppBar);
+        profileImageAppBar.setOnClickListener(this);
+        Glide.with(activity).load(App.getAppPreference().getString(AppConstants.U_IMAGE))
+                .placeholder(R.drawable.ic_profile).into(profileImageAppBar);
+
+        Button sendMessageBtn = view.findViewById(R.id.sendMessageBtn);
+        sendMessageBtn.setOnClickListener(this);
+
+        groupSmsRC = view.findViewById(R.id.groupSmsRC);
+        groupSmsRC.setLayoutManager(new LinearLayoutManager(activity));
+//        groupSmsRC.setNestedScrollingEnabled(false);
+
+        smsToUserCB = view.findViewById(R.id.smsToUserCB);
+        smsToUserCB.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean isChecked) {
+                if (isChecked) {
+                    checkUncheck = 1;
+                    for (int i = 0; i < details.size(); i++) {
+                        listIds.add(details.get(i).getUserId());
+                        details.get(i).setChecked(true);
+                    }
+                    groupSmsRC.setAdapter(new GroupSmsAdapter(activity, details, new GroupSmsAdapter.OnItemCheckListener() {
+                        @Override
+                        public void onItemCheck(String item) {
+                            checkUncheck = 0;
+                            if (!listIds.contains(item))
+                                listIds.add(item);
+                            Log.d("Beant", " message user count  " + listIds.size());
+                        }
+
+                        @Override
+                        public void onItemUncheck(String item) {
+                            checkUncheck = 0;
+                            listIds.remove(item);
+                            Log.d("Beant", " message user count  " + listIds.size());
+                        }
+                    }));
+                } else {
+                    checkUncheck = 0;
+                    listIds.clear();
+                    for (int i = 0; i < details.size(); i++) {
+                        details.get(i).setChecked(false);
+                    }
+                    groupSmsRC.setAdapter(new GroupSmsAdapter(activity, details, new GroupSmsAdapter.OnItemCheckListener() {
+                        @Override
+                        public void onItemCheck(String item) {
+                            checkUncheck = 0;
+                            if (!listIds.contains(item))
+                                listIds.add(item);
+                            Log.d("Beant", " message user count  " + listIds.size());
+                        }
+
+                        @Override
+                        public void onItemUncheck(String item) {
+                            checkUncheck = 0;
+                            listIds.remove(item);
+                            Log.d("Beant", " message user count  " + listIds.size());
+                        }
+                    }));
+                }
+            }
+        });
+
+        getAllUsersForSms("", "");
+
+        LocalBroadcastManager.getInstance(activity).registerReceiver(mMessageReceiver,
+                new IntentFilter(AppConstants.CHANGE_IMAGE_KEY));
+
+    }
+
+    private BroadcastReceiver mMessageReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // Get extra data included in the Intent
+            String image = intent.getStringExtra("image");
+
+            Glide.with(activity).load(image).into(profileImageAppBar);
+        }
+    };
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        LocalBroadcastManager.getInstance(activity).unregisterReceiver(mMessageReceiver);
+    }
+
+    @Override
+    public void onClick(View view) {
+        switch (view.getId()) {
+            case R.id.profileImageAppBar:
+                startActivity(new Intent(activity, ProfileActivity.class));
+                break;
+
+            case R.id.filterAppbar:
+                filterDialog();
+                break;
+
+            case R.id.homeLogoBack:
+                activity.onBackPressed();
+                break;
+
+            case R.id.sendMessageBtn:
+                dialogNotify();
+                break;
+        }
+    }
+
+    private void filterDialog() {
+
+        final Dialog dialog = new Dialog(activity);
+        dialog.setContentView(R.layout.dialog_filter_users);
+        dialog.setCancelable(false);
+        dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+
+        final AutoCompleteTextView searchText = dialog.findViewById(R.id.searchText);
+
+        Spinner searchTypeSpinner = dialog.findViewById(R.id.searchTypeSpinner);
+
+        List<String> typeList = new ArrayList<>();
+        typeList.add("Search Type");
+        typeList.add("District");
+        typeList.add("Area");
+        typeList.add("Constitution");
+        typeList.add("Qualification");
+
+        final ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(activity, R.layout.item_text, typeList);
+        searchTypeSpinner.setAdapter(spinnerAdapter);
+
+        searchTypeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+                searchType = adapterView.getSelectedItem().toString();
+
+                if (searchType.equalsIgnoreCase("District")) {
+                    changeList = 1;
+                    searchType = "user_district";
+                    final ArrayAdapter<String> adapter = new ArrayAdapter<String>(activity,
+                            R.layout.item_text, districtList);
+                    searchText.setThreshold(1);  //will start working from first character
+                    searchText.setAdapter(adapter);
+                    adapter.notifyDataSetChanged();
+                } else if (searchType.equalsIgnoreCase("Area")) {
+                    changeList = 1;
+                    searchType = "area_code";
+                    final ArrayAdapter<String> adapter = new ArrayAdapter<String>(activity,
+                            R.layout.item_text, areaList);
+                    searchText.setThreshold(1);  //will start working from first character
+                    searchText.setAdapter(adapter);
+                    adapter.notifyDataSetChanged();
+                } else if (searchType.equalsIgnoreCase("Constitution")) {
+                    changeList = 1;
+                    searchType = "constution";
+                    final ArrayAdapter<String> adapter = new ArrayAdapter<String>(activity,
+                            R.layout.item_text, constitutionList);
+                    searchText.setThreshold(1);  //will start working from first character
+                    searchText.setAdapter(adapter);
+                    adapter.notifyDataSetChanged();
+                } else if (searchType.equalsIgnoreCase("Qualification")) {
+                    changeList = 1;
+                    searchType = "qualification";
+                    final ArrayAdapter<String> adapter = new ArrayAdapter<String>(activity,
+                            android.R.layout.simple_spinner_item, qualificationList);
+                    searchText.setThreshold(1);  //will start working from first character
+                    searchText.setAdapter(adapter);
+                    adapter.notifyDataSetChanged();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+
+            }
+        });
+
+        Button submitBtnUsersFilter = dialog.findViewById(R.id.submitBtnUsersFilter);
+        submitBtnUsersFilter.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                String text = searchText.getText().toString().trim();
+                if (text.isEmpty()) {
+                    Toast.makeText(activity, "Enter search", Toast.LENGTH_SHORT).show();
+                } else {
+                    dialog.dismiss();
+                    smsToUserCB.setChecked(false);
+                    getAllUsersForSms(searchType, searchText.getText().toString().trim());
+                }
+            }
+        });
+
+        Button cancelBtnUsersFilter = dialog.findViewById(R.id.cancelBtnUsersFilter);
+        cancelBtnUsersFilter.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                dialog.dismiss();
+            }
+        });
+
+        dialog.show();
+
+    }
+
+    private void getAllUsersForSms(String searchType, String searchText) {
+
+        if (CommonUtils.InternetCheck(activity)) {
+            CommonUtils.showProgress(activity);
+            apiInterface.getUsersForSMS(searchType, searchText).enqueue(new Callback<GroupSmsPojo>() {
+                @Override
+                public void onResponse(@NonNull Call<GroupSmsPojo> call, @NonNull Response<GroupSmsPojo> response) {
+                    CommonUtils.dismiss();
+                    if (response.body() != null) {
+                        if (response.body().getStatus().equalsIgnoreCase("1")) {
+                            details = response.body().getDetail();
+                            checkUncheck = 0;
+                            if (changeList == 0) {
+                                districtList.clear();
+                                areaList.clear();
+                                constitutionList.clear();
+                                qualificationList.clear();
+                                for (int i = 0; i < details.size(); i++) {
+                                    if (!districtList.contains(details.get(i).getUserDistrict())) {
+                                        districtList.add(details.get(i).getUserDistrict());
+                                    }
+                                    if (!areaList.contains(details.get(i).getAreaCode())) {
+                                        areaList.add(details.get(i).getAreaCode());
+                                    }
+                                    if (!constitutionList.contains(details.get(i).getConstution())) {
+                                        constitutionList.add(details.get(i).getConstution());
+                                    }
+                                    if (!qualificationList.contains(details.get(i).getQualification())) {
+                                        qualificationList.add(details.get(i).getQualification());
+                                    }
+                                }
+                                Log.d("aListA", "onResponse: " + districtList);
+                                Log.d("aListA", "onResponse: " + areaList);
+                                Log.d("aListA", "onResponse: " + constitutionList);
+                                Log.d("aListA", "onResponse: " + qualificationList);
+                            }
+                            groupSmsRC.setAdapter(adapter = new GroupSmsAdapter(activity, details,
+                                    new GroupSmsAdapter.OnItemCheckListener() {
+                                        @Override
+                                        public void onItemCheck(String item) {
+                                            checkUncheck = 0;
+                                            if (!listIds.contains(item))
+                                                listIds.add(item);
+                                            Log.d("Beant", " message user count  " + listIds.size());
+                                        }
+
+                                        @Override
+                                        public void onItemUncheck(String item) {
+                                            checkUncheck = 0;
+                                            listIds.remove(item);
+                                            Log.d("Beant", " message user count  " + listIds.size());
+                                        }
+                                    }));
+                        } else {
+                            Toast.makeText(activity, response.body().getMsg(), Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        Toast.makeText(activity, AppConstants.SOMETHING_WENT_WRONG, Toast.LENGTH_SHORT).show();
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<GroupSmsPojo> call, @NonNull Throwable t) {
+                    CommonUtils.dismiss();
+                    Toast.makeText(activity, AppConstants.SOMETHING_WENT_WRONG, Toast.LENGTH_SHORT).show();
+                }
+            });
+        } else {
+            Toast.makeText(activity, AppConstants.INTERNET_CHECK, Toast.LENGTH_SHORT).show();
+        }
+
+    }
+
+    private void dialogNotify() {
+
+        final Dialog dialog = new Dialog(activity);
+        dialog.setContentView(R.layout.dialog_notify);
+        dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+
+        TextView topHeading = dialog.findViewById(R.id.topHeading);
+        topHeading.setText(R.string.send_group_message);
+
+        final EditText messageNotifyET = dialog.findViewById(R.id.messageNotifyET);
+
+        Button submitBtnNotify = dialog.findViewById(R.id.submitBtnNotify);
+        submitBtnNotify.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                String message = messageNotifyET.getText().toString();
+                if (message.isEmpty()) {
+                    Toast.makeText(activity, "Please enter your message", Toast.LENGTH_SHORT).show();
+                } else {
+                    dialog.dismiss();
+                    sendGroupMessageApi(message);
+                }
+            }
+        });
+
+        Button cancelBtnNotify = dialog.findViewById(R.id.cancelBtnNotify);
+        cancelBtnNotify.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                dialog.dismiss();
+            }
+        });
+
+        dialog.show();
+
+    }
+
+    private void sendGroupMessageApi(String message) {
+
+        ApiInterface apiInterface = ApiClient.getClient().create(ApiInterface.class);
+
+        String ids = TextUtils.join(",", listIds);
+
+        Log.d("Beant", "sendGroupMessageApi: " + listIds.toString() + "\nmessage user count  " + listIds.size());
+
+        if (CommonUtils.InternetCheck(activity)) {
+            CommonUtils.showProgress(activity);
+            apiInterface.sendGroupMessage(ids, message).enqueue(new Callback<SendGroupMessagePojo>() {
+                @Override
+                public void onResponse(@NonNull Call<SendGroupMessagePojo> call, @NonNull Response<SendGroupMessagePojo> response) {
+                    CommonUtils.dismiss();
+                    if (response.body() != null) {
+                        if (response.body().getStatus().equalsIgnoreCase("1")) {
+                            Toast.makeText(activity, response.body().getMsg(), Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(activity, response.body().getMsg(), Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        Toast.makeText(activity, AppConstants.SOMETHING_WENT_WRONG, Toast.LENGTH_SHORT).show();
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<SendGroupMessagePojo> call, @NonNull Throwable t) {
+                    CommonUtils.dismiss();
+                    Log.d("Beant", "sendGroupMessageApi: " + t.getMessage());
+                    if (t.getMessage().equalsIgnoreCase("timeout"))
+                        Toast.makeText(activity, AppConstants.SOMETHING_WENT_WRONG, Toast.LENGTH_SHORT).show();
+                    else
+                        Toast.makeText(activity, AppConstants.SOMETHING_WENT_WRONG, Toast.LENGTH_SHORT).show();
+                }
+            });
+        } else {
+            Toast.makeText(activity, AppConstants.INTERNET_CHECK, Toast.LENGTH_SHORT).show();
+        }
+
+    }
+
+}
