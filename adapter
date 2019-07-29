@@ -1,0 +1,96 @@
+package com.knickglobal.adminapp.adapters;
+
+import android.app.Activity;
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.knickglobal.adminapp.R;
+
+import com.knickglobal.adminapp.model.GroupSmsPojo;
+
+import java.util.List;
+
+public class GroupSmsAdapter extends RecyclerView.Adapter<GroupSmsAdapter.GroupSmsViewHolder> {
+
+    private Activity activity;
+    private List<GroupSmsPojo.Detail> detail;
+
+    @NonNull
+    private OnItemCheckListener onItemCheckListener;
+
+    public GroupSmsAdapter(Activity activity, List<GroupSmsPojo.Detail> detail,
+                           @NonNull OnItemCheckListener onItemCheckListener) {
+        this.activity = activity;
+        this.detail = detail;
+        this.onItemCheckListener = onItemCheckListener;
+        this.notifyDataSetChanged();
+    }
+
+    @NonNull
+    @Override
+    public GroupSmsViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(activity).inflate(R.layout.item_group_sms, parent, false);
+
+        return new GroupSmsViewHolder(view);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull GroupSmsViewHolder holder, int position) {
+        holder.bind(position);
+        if (position == 0)
+            Log.d("Beant", " total user count  " + detail.size());
+    }
+
+    @Override
+    public int getItemCount() {
+        return detail.size();
+    }
+
+    public interface OnItemCheckListener {
+        void onItemCheck(String item);
+
+        void onItemUncheck(String item);
+    }
+
+    class GroupSmsViewHolder extends RecyclerView.ViewHolder implements CompoundButton.OnCheckedChangeListener {
+        TextView nameForSMS, userIdForSMS;
+        CheckBox checkUserForSMS;
+
+        GroupSmsViewHolder(@NonNull View itemView) {
+            super(itemView);
+            nameForSMS = itemView.findViewById(R.id.nameForSMS);
+            userIdForSMS = itemView.findViewById(R.id.userIdForSMS);
+            checkUserForSMS = itemView.findViewById(R.id.checkUserForSMS);
+            checkUserForSMS.setOnCheckedChangeListener(this);
+        }
+
+        void bind(int position) {
+            userIdForSMS.setText(detail.get(position).getUserId());
+            nameForSMS.setText(detail.get(position).getUserName());
+            if (detail.get(position).getChecked()) {
+                checkUserForSMS.setChecked(true);
+            } else {
+                checkUserForSMS.setChecked(false);
+            }
+        }
+
+        @Override
+        public void onCheckedChanged(CompoundButton compoundButton, boolean isChecked) {
+            if (isChecked) {
+                detail.get(getAdapterPosition()).setChecked(true);
+                onItemCheckListener.onItemCheck(detail.get(getAdapterPosition()).getUserId());
+            } else {
+                detail.get(getAdapterPosition()).setChecked(false);
+                onItemCheckListener.onItemUncheck(detail.get(getAdapterPosition()).getUserId());
+            }
+        }
+    }
+}
